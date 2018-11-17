@@ -18,9 +18,9 @@ lemmatizer = WordNetLemmatizer()
 num_cores = multiprocessing.cpu_count()
 
 
-def get_batches(tokens, n):
-    batches = []
-    idx = len(tokens) // 8
+def get_bathes(tokens, n):
+    bathes = []
+    idx = len(tokens) // n
     idxs = []
     for i in range(n):
         start = i * idx
@@ -28,23 +28,25 @@ def get_batches(tokens, n):
         if i + 1 == n:
             end = len(tokens)
         idxs.append((start, end))
-        batches.append(tokens[start: end])
-    assert len(set(tokens)) == len(set(chain.from_iterable(batches)))
-    return batches
+        bathes.append(tokens[start: end])
+    assert len(set(tokens)) == len(set(chain.from_iterable(bathes)))
+    return bathes
 
 
-def get_words(tokens):
+def process_tokens(tokens):
     words = []
     for word in tqdm(tokens):
         word = lemmatizer.lemmatize(word)
-        if word not in global_stop_words:
+        condition = word not in global_stop_words
+        condition = condition and len(word) >= 3
+        if condition:
             words.append(word)
     return words
 
 
-def get_words_par(tokens, cores):
+def process_tokens_parallel(bathes, cores):
     with Pool(cores) as pool:
-        df = pool.map(get_words, tokens)
+        df = pool.map(process_tokens, bathes)
         pool.close()
         pool.join()
         return df
@@ -52,10 +54,10 @@ def get_words_par(tokens, cores):
 
 tokens = re.split("\W+", text.lower())
 start = time.time()
-print(len(get_words(tokens)))
+print(len(set(process_tokens(tokens))))
 print("taken", time.time() - start)
 
-batches = get_batches(tokens, n=num_cores)
+bathes = get_bathes(tokens, n=num_cores)
 start = time.time()
-print(len(list(chain.from_iterable(get_words_par(batches, num_cores)))))
+print(len(set(chain.from_iterable(process_tokens_parallel(bathes, num_cores)))))
 print("taken", time.time() - start)
